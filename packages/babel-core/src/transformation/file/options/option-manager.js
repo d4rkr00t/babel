@@ -282,21 +282,33 @@ export default class OptionManager {
    */
   resolvePresets(presets: Array<string | Object>, dirname: string, onResolve?) {
     return presets.map(val => {
+      let options;
+      if (Array.isArray(val)){
+        [val, options] = val;
+      }
+
+      let presetLoc;
       if (typeof val === "string") {
-        let presetLoc = resolve(`babel-preset-${val}`, dirname) || resolve(val, dirname);
-        if (presetLoc) {
-          let val = require(presetLoc);
-          onResolve && onResolve(val, presetLoc);
-          return val;
-        } else {
+        presetLoc = resolve(`babel-preset-${val}`, dirname) || resolve(val, dirname);
+        if (!presetLoc) {
           throw new Error(`Couldn't find preset ${JSON.stringify(val)} relative to directory ${JSON.stringify(dirname)}`);
         }
-      } else if (typeof val === "object") {
-        onResolve && onResolve(val);
-        return val;
-      } else {
+
+        val = require(presetLoc);
+      }
+
+      if (typeof val !== "function" && options !== undefined) {
+        throw new Error(`Options ${JSON.stringify(options)} passed to ${presetLoc || "a preset"} which does not accept options.`);
+      }
+
+      if (typeof val === "function") val = val(options);
+
+      if (typeof val !== "object") {
         throw new Error(`Unsupported preset format: ${val}.`);
       }
+
+      onResolve && onResolve(val);
+      return val;
     });
   }
 
