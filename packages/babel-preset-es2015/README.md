@@ -23,7 +23,7 @@ $ npm install --save-dev babel-preset-es2015
 ### Via CLI
 
 ```sh
-$ babel script.js --presets es2015 
+$ babel script.js --presets es2015
 ```
 
 ### Via Node API
@@ -32,4 +32,21 @@ $ babel script.js --presets es2015
 require("babel-core").transform("code", {
   presets: ["es2015"]
 });
+```
+
+## Options
+
+Pass options to plugins:
+
+```js
+{
+  presets: [
+    [
+      "es2015",
+      {
+        "transform-es2015-classes": { "loose": true }
+      }
+    ]
+  ]
+}
 ```

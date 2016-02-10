@@ -9,6 +9,7 @@ import isAbsolute from "path-is-absolute";
 import pathExists from "path-exists";
 import cloneDeep from "lodash/lang/cloneDeep";
 import clone from "lodash/lang/clone";
+import defaults from "lodash/object/defaults";
 import merge from "../../../helpers/merge";
 import config from "./config";
 import path from "path";
@@ -305,27 +306,57 @@ export default class OptionManager {
     });
   }
 
+  requirePluginFactory(options: ?Object) {
+    return function requirePlugin(require?, plugin: string, defaultOptions: ?Object) {
+      if (typeof require === "string") {
+        defaultOptions = plugin;
+        plugin = require;
+      }
+
+      let pluginOptions = options && options[plugin.replace("babel-plugin-", "")];
+
+      return pluginOptions || defaultOptions ?
+        [require(plugin), defaults({}, pluginOptions, defaultOptions)] :
+        require(plugin);
+    };
+  }
+
   /**
    * Resolves presets options which can be either direct object data,
    * or a module name to require.
    */
   resolvePresets(presets: Array<string | Object>, dirname: string, onResolve?) {
-    return presets.map(val => {
-      if (typeof val === "string") {
-        let presetLoc = resolve(`babel-preset-${val}`, dirname) || resolve(val, dirname);
-        if (presetLoc) {
-          let val = require(presetLoc);
-          onResolve && onResolve(val, presetLoc);
-          return val;
-        } else {
-          throw new Error(`Couldn't find preset ${JSON.stringify(val)} relative to directory ${JSON.stringify(dirname)}`);
-        }
-      } else if (typeof val === "object") {
-        onResolve && onResolve(val);
-        return val;
-      } else {
-        throw new Error(`Unsupported preset format: ${val}.`);
+    return presets.map(preset => {
+      let origPreset = preset;
+      let options;
+
+      if (Array.isArray(preset)) {
+        [preset, options] = preset;
+        origPreset = preset;
       }
+
+      if (typeof preset === "string") {
+        let presetLoc = resolve(`babel-preset-${preset}`, dirname) || resolve(preset, dirname);
+
+        if (!presetLoc) {
+          throw new Error(`Couldn't find preset ${JSON.stringify(origPreset)} relative to directory ${JSON.stringify(dirname)}`);
+        }
+
+        preset = require(presetLoc);
+      }
+
+      if (typeof preset === "function") {
+        preset = preset(this.requirePluginFactory(options));
+      } else if (options) {
+        throw new Error(`Options ${JSON.stringify(options)} passed to ${origPreset || "a preset"} which does not accept options.`);
+      }
+
+      if (typeof preset === "object") {
+        onResolve && onResolve(preset);
+        return preset;
+      }
+
+      throw new Error(`Unsupported format for preset: ${origPreset}. Expected "object" but got "${typeof preset}".`);
     });
   }
 
